@@ -17,7 +17,7 @@ execute_process(
 if(NOT VBE_VERSION)
   set(VBE_VERSION "unknown")
 endif()
-add_executable(vbeterm src/term.cxx src/color.cxx)
+add_executable(vbeterm src/term.cxx)
 target_link_libraries(vbeterm PRIVATE
   PkgConfig::VTE
   PkgConfig::GTK
