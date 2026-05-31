@@ -29,9 +29,9 @@
 /* Minimum prefix to try completing a word. */
 #define TERM_DABBREV_MIN_PREFIX 2
 /* Terminal opacity */
-#define TERM_OPACITY 0.9
+#define TERM_OPACITY 1
 /* Terminal font */
-#define TERM_FONT "Iosevka Term SS18 10"
+#define TERM_FONT "SF Mono 14"
 
 gboolean dabbrev_expand(GtkWindow *, VteTerminal *);
 void dabbrev_stop(VteTerminal *);
