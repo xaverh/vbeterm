@@ -1,5 +1,7 @@
 cmake_minimum_required(VERSION 3.12)
-project(vbeterm LANGUAGES C)
+project(vbeterm LANGUAGES CXX)
+set(CMAKE_CXX_STANDARD 23)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 find_package(PkgConfig REQUIRED)
 pkg_check_modules(VTE REQUIRED IMPORTED_TARGET vte-2.91)
@@ -15,7 +17,7 @@ execute_process(
 if(NOT VBE_VERSION)
   set(VBE_VERSION "unknown")
 endif()
-add_executable(vbeterm src/term.c src/color.c)
+add_executable(vbeterm src/term.cxx src/color.cxx)
 target_link_libraries(vbeterm PRIVATE
   PkgConfig::VTE
   PkgConfig::GTK
@@ -28,7 +30,7 @@ target_compile_definitions(vbeterm PRIVATE
   PACKAGE_VERSION="${VBE_VERSION}"
   VERSION="${VBE_VERSION}"
 )
-if(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
+if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
   target_compile_options(vbeterm PRIVATE
     -fdiagnostics-show-option
     -pipe

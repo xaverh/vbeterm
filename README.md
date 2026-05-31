@@ -59,7 +59,7 @@ Execute the following commands:
     $ cmake --build build
     $ sudo cmake --install build
 
-(Uses the Unix Makefiles generator by default. To pick compiler: CC=clang cmake ... or -DCMAKE_C_COMPILER=clang .)
+(Uses the Unix Makefiles generator by default. To pick compiler: CXX=clang++ cmake ... or -DCMAKE_CXX_COMPILER=clang++ .)
 
 You need the VTE 2.91 development files. On Debian/Ubuntu, the package is `libvte-2.91-dev`.
 

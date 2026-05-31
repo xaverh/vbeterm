@@ -15,7 +15,7 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
-#include "term.h"
+#include "term.hxx"
 
 #include <stdlib.h>
 #include <string.h>
@@ -81,7 +81,7 @@ on_char_size_changed(GtkWidget *terminal, guint width, guint height, gpointer us
 static void
 on_title_changed(VteTerminal *terminal, const char *prop, gpointer user_data)
 {
-	GtkWindow *window = user_data;
+	GtkWindow *window = (GtkWindow *)user_data;
 	const char *title = vte_terminal_get_termprop_string_by_id(
 	    terminal, VTE_PROPERTY_ID_XTERM_TITLE, NULL);
 	gtk_window_set_title(window, title ?: PACKAGE_NAME);
@@ -90,7 +90,7 @@ on_title_changed(VteTerminal *terminal, const char *prop, gpointer user_data)
 static void
 terminate(GtkWindow *window, gint status)
 {
-	GApplicationCommandLine *cmdline = g_object_get_data(G_OBJECT(window), "cmdline");
+	GApplicationCommandLine *cmdline = (GApplicationCommandLine *)g_object_get_data(G_OBJECT(window), "cmdline");
 	if (cmdline) {
 		g_application_command_line_set_exit_status(cmdline, status);
 		g_object_unref(cmdline);
@@ -101,7 +101,7 @@ terminate(GtkWindow *window, gint status)
 static gboolean
 on_child_exit(VteTerminal *term, gint status, gpointer user_data)
 {
-	GtkWindow *window = user_data;
+	GtkWindow *window = (GtkWindow *)user_data;
 	terminate(window, status);
 	return TRUE;
 }
@@ -116,7 +116,7 @@ on_window_close(GtkWidget *widget, GdkEvent *event, gpointer user_data)
 static gboolean
 on_window_focus(GtkWidget *widget, GdkEvent *event, gpointer user_data)
 {
-	GtkWindow *window = user_data;
+	GtkWindow *window = (GtkWindow *)user_data;
 	gtk_window_set_urgency_hint(window, FALSE);
 	return FALSE;
 }
@@ -124,7 +124,7 @@ on_window_focus(GtkWidget *widget, GdkEvent *event, gpointer user_data)
 static gboolean
 on_bell(GtkWidget *widget, GdkEvent *event, gpointer user_data)
 {
-	GtkWindow *window = user_data;
+	GtkWindow *window = (GtkWindow *)user_data;
 	if (!gtk_window_is_active(window)) {
 		gtk_window_set_urgency_hint(window, TRUE);
 	}
@@ -202,7 +202,7 @@ child_ready(VteTerminal *terminal, GPid pid, GError *error, gpointer user_data)
 {
 	if (!terminal) return;
 	if (pid == -1) {
-		GtkWindow *window = user_data;
+		GtkWindow *window = (GtkWindow *)user_data;
 		terminate(window, error->code);
 		g_error_free(error);
 	}
@@ -234,7 +234,8 @@ apply_colorscheme(VteTerminal *terminal, int idx)
 	generate_palette(palette, &bg, &fg);
 	vte_terminal_set_colors(terminal, &fg, &bg, palette, 256);
 	vte_terminal_set_bold_is_bright(terminal, TRUE);
-	vte_terminal_set_color_cursor(terminal, &CLR_GDK(cursors[idx]));
+	GdkRGBA cc = CLR_GDK(cursors[idx]);
+	vte_terminal_set_color_cursor(terminal, &cc);
 	vte_terminal_set_cursor_blink_mode(terminal, VTE_CURSOR_BLINK_ON);
 }
 
@@ -248,7 +249,7 @@ command_line(GApplication *app, GApplicationCommandLine *cmdline, gpointer user_
 	/* No point of respecting LC_NUMERIC in a terminal. */
 	setlocale(LC_NUMERIC, "C");
 
-	const gchar *class = NULL;
+	const gchar *cls = NULL;
 	const gchar *name = NULL;
 	window = gtk_window_new(GTK_WINDOW_TOPLEVEL);
 	gtk_window_set_title(GTK_WINDOW(window), PACKAGE_NAME);
@@ -261,9 +262,9 @@ command_line(GApplication *app, GApplicationCommandLine *cmdline, gpointer user_
 
 #ifdef GDK_WINDOWING_X11
 	/* Set WMCLASS */
-	g_variant_dict_lookup(options, "class", "&s", &class);
+	g_variant_dict_lookup(options, "class", "&s", &cls);
 	g_variant_dict_lookup(options, "name", "&s", &name);
-	if (class != NULL || name != NULL) {
+	if (cls != NULL || name != NULL) {
 		gtk_widget_realize(GTK_WIDGET(window));
 
 		GdkWindow *gwindow = gtk_widget_get_window(GTK_WIDGET(window));
@@ -272,10 +273,10 @@ command_line(GApplication *app, GApplicationCommandLine *cmdline, gpointer user_
 			Display *xdisplay = gdk_x11_display_get_xdisplay(gdisplay);
 			Window xwindow = gdk_x11_window_get_xid(gwindow);
 			XClassHint *class_hint = XAllocClassHint();
-			class = class?class:gdk_get_program_class();
+			cls = cls?cls:gdk_get_program_class();
 			name = name?name:g_get_prgname();
 			class_hint->res_name = strdup(name);
-			class_hint->res_class = strdup(class);
+			class_hint->res_class = strdup(cls);
 			XSetClassHint(xdisplay, xwindow, class_hint);
 			free(class_hint->res_name);
 			free(class_hint->res_class);
@@ -339,7 +340,7 @@ command_line(GApplication *app, GApplicationCommandLine *cmdline, gpointer user_
 	    g_application_command_line_get_cwd(cmdline), /* working directory */
 	    command,
 	    env,		/* envv */
-	    0,			/* spawn flags */
+	    (GSpawnFlags)0,			/* spawn flags */
 	    NULL, NULL, NULL,	/* child setup */
 	    -1,			/* timeout */
 	    NULL,		/* cancellable */
@@ -357,7 +358,7 @@ main(int argc, char *argv[])
 	GtkApplication *app;
 	gint status;
 	app = gtk_application_new("ch.bernat.Terminal8",
-	    G_APPLICATION_HANDLES_COMMAND_LINE | G_APPLICATION_SEND_ENVIRONMENT | G_APPLICATION_NON_UNIQUE);
+	    (GApplicationFlags)(G_APPLICATION_HANDLES_COMMAND_LINE | G_APPLICATION_SEND_ENVIRONMENT | G_APPLICATION_NON_UNIQUE));
 	g_signal_connect(app, "command-line", G_CALLBACK(command_line), NULL);
 	g_application_add_main_option_entries(G_APPLICATION(app),
 	    (const GOptionEntry[]){
