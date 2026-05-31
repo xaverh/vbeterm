@@ -14,3 +14,6 @@
 
 # clangd / LSP
 /compile_commands.json
+
+# new make build
+/vbeterm

@@ -55,11 +55,10 @@ Installation
 
 Execute the following commands:
 
-    $ cmake -B build
-    $ cmake --build build
-    $ sudo cmake --install build
+    $ make
+    $ sudo make install
 
-(Uses the Unix Makefiles generator by default. To pick compiler: CXX=clang++ cmake ... or -DCMAKE_CXX_COMPILER=clang++ .)
+(Set CXX=clang++ or CXX=g++ on the make command line to pick the compiler.)
 
 You need the VTE 2.91 development files. On Debian/Ubuntu, the package is `libvte-2.91-dev`.
 
@@ -70,7 +69,4 @@ The project includes `compile_flags.txt` and `.clangd` so that clangd-based lint
 (Vim + ALE/coc + clangd, VSCode clangd, etc.) can find `<vte/vte.h>` and GTK types
 out of the box for basic editing/linting.
 
-CMake automatically exports `compile_commands.json` (in the build directory) when configured.
-For full project-wide db, point your linter at the build dir or copy/symlink it.
-
-`bear` is still useful in some editor setups but not required for basic compilation database support.
+`bear -- make` (or just `make` if your editor does not need a compilation database) is useful for clangd-based linters in some setups but not required; the project also ships `compile_flags.txt` and `.clangd` as portable fallbacks for header resolution.
