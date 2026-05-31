@@ -26,15 +26,11 @@
 
 /* Non alphanumeric characters we consider part of a word. */
 #define TERM_WORD_CHARS "-./?%&_=+@~:"
-/* Minimum prefix to try completing a word. */
-#define TERM_DABBREV_MIN_PREFIX 2
 /* Terminal opacity */
 #define TERM_OPACITY 1
 /* Terminal font */
 #define TERM_FONT "SF Mono 14"
 
-gboolean dabbrev_expand(GtkWindow *, VteTerminal *);
-void dabbrev_stop(VteTerminal *);
 void generate_palette(GdkRGBA *, const GdkRGBA *, const GdkRGBA *);
 
 #endif

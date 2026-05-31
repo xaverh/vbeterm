@@ -49,8 +49,6 @@ Features
 
  - No tab support
  - Use of VTE 2.90 (GTK3)
- - Single instance managing several terminals.
- - dabbrev-expand (mapped on `Alt-/`)
 
 Installation
 ------------

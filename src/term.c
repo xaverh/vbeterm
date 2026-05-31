@@ -144,17 +144,7 @@ on_key_press(GtkWidget *terminal, GdkEventKey *event, gpointer user_data)
 			return TRUE;
 		}
 		break;
-	case GDK_MOD1_MASK:
-		switch (event->keyval) {
-		case GDK_KEY_slash:
-			if (dabbrev_expand(GTK_WINDOW(user_data), VTE_TERMINAL(terminal))) {
-				return TRUE;
-			}
-			return FALSE;
-		}
-		break;
 	}
-	dabbrev_stop(VTE_TERMINAL(terminal));
 	return FALSE;
 }
 
@@ -301,7 +291,7 @@ command_line(GApplication *app, GApplicationCommandLine *cmdline, gpointer user_
 	vte_terminal_set_color_cursor(VTE_TERMINAL(terminal),
 	    &CLR_GDK(0x00bb00));
 	vte_terminal_set_cursor_blink_mode(VTE_TERMINAL(terminal),
-	    VTE_CURSOR_BLINK_OFF);
+	    VTE_CURSOR_BLINK_ON);
 	reset_font_size(VTE_TERMINAL(terminal));
 
 	vte_terminal_set_audible_bell(VTE_TERMINAL(terminal),
@@ -344,7 +334,7 @@ main(int argc, char *argv[])
 	GtkApplication *app;
 	gint status;
 	app = gtk_application_new("ch.bernat.Terminal8",
-	    G_APPLICATION_HANDLES_COMMAND_LINE | G_APPLICATION_SEND_ENVIRONMENT);
+	    G_APPLICATION_HANDLES_COMMAND_LINE | G_APPLICATION_SEND_ENVIRONMENT | G_APPLICATION_NON_UNIQUE);
 	g_signal_connect(app, "command-line", G_CALLBACK(command_line), NULL);
 	g_application_add_main_option_entries(G_APPLICATION(app),
 	    (const GOptionEntry[]){
