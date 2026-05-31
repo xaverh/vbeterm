@@ -55,11 +55,22 @@ Installation
 
 Execute the following commands:
 
-    $ ./configure
-    $ make
-    $ sudo make install
+    $ cmake -B build
+    $ cmake --build build
+    $ sudo cmake --install build
 
-You need VTE 0.40.x which is not yet widely available. You can look at commit
-[d98dad](https://github.com/vincentbernat/vbeterm/tree/d98dad045089929917c7e400808d410628019ef0)
-for a version working with a more ancient version. On Debian, the
-appropriate package is `libvte-dev`.
+(Uses the Unix Makefiles generator by default. To pick compiler: CC=clang cmake ... or -DCMAKE_C_COMPILER=clang .)
+
+You need the VTE 2.91 development files. On Debian/Ubuntu, the package is `libvte-2.91-dev`.
+
+Development
+-----------
+
+The project includes `compile_flags.txt` and `.clangd` so that clangd-based linters
+(Vim + ALE/coc + clangd, VSCode clangd, etc.) can find `<vte/vte.h>` and GTK types
+out of the box for basic editing/linting.
+
+CMake automatically exports `compile_commands.json` (in the build directory) when configured.
+For full project-wide db, point your linter at the build dir or copy/symlink it.
+
+`bear` is still useful in some editor setups but not required for basic compilation database support.

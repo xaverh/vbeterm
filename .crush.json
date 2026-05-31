@@ -1,0 +1,15 @@
+{
+  "$schema": "https://charm.land/crush.json",
+  "lsp": {
+    "c": {
+      "command": "clangd",
+      "args": ["--background-index", "--log=error"],
+      "filetypes": ["c", "h"],
+      "root_markers": ["configure.ac", ".jj", "Makefile"]
+    }
+  },
+  "options": {
+    "auto_lsp": true,
+    "debug_lsp": false
+  }
+}

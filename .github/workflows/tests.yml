@@ -12,9 +12,8 @@ jobs:
       - name: Install dependencies
         run: |
           sudo apt -qyy update > /dev/null
-          sudo apt -qyy install build-essential libvte-2.91-dev > /dev/null
+          sudo apt -qyy install build-essential libvte-2.91-dev cmake pkg-config > /dev/null
       - name: Build
         run: |
-          ./autogen.sh
-          ./configure
-          make
+          cmake -B build -DCMAKE_BUILD_TYPE=Release
+          cmake --build build
