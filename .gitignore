@@ -17,3 +17,5 @@
 
 # new make build
 /vbeterm
+
+.crush.json
