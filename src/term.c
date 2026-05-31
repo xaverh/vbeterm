@@ -30,6 +30,25 @@
 #include <X11/Xlib.h>
 #endif
 
+#define CLR_R(x)       (((x) & 0xff0000) >> 16)
+#define CLR_G(x)       (((x) & 0x00ff00) >>  8)
+#define CLR_B(x)       (((x) & 0x0000ff) >>  0)
+#define CLR_16(x)      ((double)(x) / 0xff)
+#define CLR_GDKA(x, a) (const GdkRGBA){ .red = CLR_16(CLR_R(x)), .green = CLR_16(CLR_G(x)), .blue = CLR_16(CLR_B(x)), .alpha = a }
+#define CLR_GDK(x)     CLR_GDKA(x, 0)
+
+static const guint32 schemes[4][16]={
+{0x111111,0xd36265,0xaece91,0xe7e18c,0x5297cf,0xde7fa8,0x5e7175,0xbebebe,0x555555,0xef8171,0xcfefb3,0xfff796,0x74b8ef,0xe393b6,0xa3babf,0xdddddd},
+{0x21222c,0xff5555,0x50fa7b,0xf1fa8c,0xbd93f9,0xff79c6,0x8be9fd,0xf8f8f2,0x6272a4,0xff6e6e,0x69ff94,0xffffa5,0xd6acff,0xff92df,0xa4ffff,0xffffff},
+{0xfffbeb,0xcb3a2a,0x14710a,0x846e15,0x644ac9,0xa3144d,0x036a96,0x1f1f1f,0x6c664b,0xd74c3d,0x198d0c,0x9e841a,0x7862d0,0xbf185a,0x047fb4,0x2c2b31},
+{0x000000,0xff0000,0x00ff00,0xffff00,0x0000ff,0xff00ff,0x00ffff,0xffffff,0x666666,0xff6666,0x66ff66,0xffff66,0x6666ff,0xff66ff,0x66ffff,0xffffff}
+};
+static const guint32 fgs[4]={0xffffff,0xf8f8f2,0x1f1f1f,0xffffff};
+static const guint32 bgs[4]={0x0c0000,0x282a36,0xfffbeb,0x000000};
+static const guint32 cursors[4]={0x00bb00,0x50fa7b,0x036a96,0x00ff00};
+
+static void apply_colorscheme(VteTerminal *terminal, int idx);
+
 static void
 set_font_size(VteTerminal *terminal, gint delta)
 {
@@ -135,6 +154,18 @@ on_key_press(GtkWidget *terminal, GdkEventKey *event, gpointer user_data)
 		case GDK_KEY_equal:
 			reset_font_size(VTE_TERMINAL(terminal));
 			return TRUE;
+		case GDK_KEY_F1:
+			apply_colorscheme(VTE_TERMINAL(terminal), 0);
+			return TRUE;
+		case GDK_KEY_F2:
+			apply_colorscheme(VTE_TERMINAL(terminal), 1);
+			return TRUE;
+		case GDK_KEY_F3:
+			apply_colorscheme(VTE_TERMINAL(terminal), 2);
+			return TRUE;
+		case GDK_KEY_F4:
+			apply_colorscheme(VTE_TERMINAL(terminal), 3);
+			return TRUE;
 		}
 		break;
 	case GDK_SHIFT_MASK:
@@ -176,6 +207,36 @@ child_ready(VteTerminal *terminal, GPid pid, GError *error, gpointer user_data)
 		terminate(window, error->code);
 		g_error_free(error);
 	}
+}
+
+static void
+apply_colorscheme(VteTerminal *terminal, int idx)
+{
+	GdkRGBA fg = CLR_GDK(fgs[idx]);
+	GdkRGBA bg = CLR_GDKA(bgs[idx], TERM_OPACITY);
+	GdkRGBA palette[256] = {
+		CLR_GDK(schemes[idx][0]),
+		CLR_GDK(schemes[idx][1]),
+		CLR_GDK(schemes[idx][2]),
+		CLR_GDK(schemes[idx][3]),
+		CLR_GDK(schemes[idx][4]),
+		CLR_GDK(schemes[idx][5]),
+		CLR_GDK(schemes[idx][6]),
+		CLR_GDK(schemes[idx][7]),
+		CLR_GDK(schemes[idx][8]),
+		CLR_GDK(schemes[idx][9]),
+		CLR_GDK(schemes[idx][10]),
+		CLR_GDK(schemes[idx][11]),
+		CLR_GDK(schemes[idx][12]),
+		CLR_GDK(schemes[idx][13]),
+		CLR_GDK(schemes[idx][14]),
+		CLR_GDK(schemes[idx][15]),
+	};
+	generate_palette(palette, &bg, &fg);
+	vte_terminal_set_colors(terminal, &fg, &bg, palette, 256);
+	vte_terminal_set_bold_is_bright(terminal, TRUE);
+	vte_terminal_set_color_cursor(terminal, &CLR_GDK(cursors[idx]));
+	vte_terminal_set_cursor_blink_mode(terminal, VTE_CURSOR_BLINK_ON);
 }
 
 static void
@@ -255,44 +316,7 @@ command_line(GApplication *app, GApplicationCommandLine *cmdline, gpointer user_
 	vte_terminal_set_mouse_autohide(VTE_TERMINAL(terminal),
 	    TRUE);
 
-#define CLR_R(x)       (((x) & 0xff0000) >> 16)
-#define CLR_G(x)       (((x) & 0x00ff00) >>  8)
-#define CLR_B(x)       (((x) & 0x0000ff) >>  0)
-#define CLR_16(x)      ((double)(x) / 0xff)
-#define CLR_GDKA(x, a) (const GdkRGBA){ .red = CLR_16(CLR_R(x)), .green = CLR_16(CLR_G(x)), .blue = CLR_16(CLR_B(x)), .alpha = a }
-#define CLR_GDK(x)     CLR_GDKA(x, 0)
-
-	GdkRGBA fg = CLR_GDK(0xffffff);
-	GdkRGBA bg = CLR_GDKA(0x0c0000, TERM_OPACITY);
-	GdkRGBA palette[256] = {
-		CLR_GDK(0x111111),
-		CLR_GDK(0xd36265),
-		CLR_GDK(0xaece91),
-		CLR_GDK(0xe7e18c),
-		CLR_GDK(0x5297cf),
-		CLR_GDK(0xde7fa8),
-		CLR_GDK(0x5e7175),
-		CLR_GDK(0xbebebe),
-		CLR_GDK(0x555555),
-		CLR_GDK(0xef8171),
-		CLR_GDK(0xcfefb3),
-		CLR_GDK(0xfff796),
-		CLR_GDK(0x74b8ef),
-		CLR_GDK(0xe393b6),
-		CLR_GDK(0xa3babf),
-		CLR_GDK(0xdddddd),
-		/* 240 elements remaining */
-	};
-	generate_palette(palette, &bg, &fg);
-	vte_terminal_set_colors(VTE_TERMINAL(terminal),
-	    &fg, &bg, palette, 256);
-	vte_terminal_set_bold_is_bright(VTE_TERMINAL(terminal),
-	    TRUE);
-	vte_terminal_set_color_cursor(VTE_TERMINAL(terminal),
-	    &CLR_GDK(0x00bb00));
-	vte_terminal_set_cursor_blink_mode(VTE_TERMINAL(terminal),
-	    VTE_CURSOR_BLINK_ON);
-	reset_font_size(VTE_TERMINAL(terminal));
+	apply_colorscheme(VTE_TERMINAL(terminal), 0);
 
 	vte_terminal_set_audible_bell(VTE_TERMINAL(terminal),
 	    FALSE);
