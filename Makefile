@@ -1,5 +1,3 @@
-# vbeterm
-
 PREFIX ?= /usr/local
 CXX ?= c++
 PKG_CONFIG ?= pkg-config
@@ -13,19 +11,18 @@ CPPFLAGS += $(shell $(PKG_CONFIG) --cflags $(PKGS) 2>/dev/null)
 
 CXXFLAGS := -std=gnu++23 -O2 -fdiagnostics-show-option -pipe -Wall -Wextra -Wformat -Wformat-security -Wfatal-errors -Wcast-align -Winline -Wno-unused-parameter -Wno-missing-field-initializers
 
-UNAME_S := $(shell uname -s)
-ifneq ($(UNAME_S),Darwin)
 CXXFLAGS += -fstack-protector
 CPPFLAGS += -D_FORTIFY_SOURCE=2
 LDFLAGS += -Wl,-z,relro -Wl,-z,now
-endif
 
 LDLIBS := -lm $(shell $(PKG_CONFIG) --libs $(PKGS) 2>/dev/null)
 
+COMPILE = $(CXX) $(CPPFLAGS) $(CXXFLAGS)
+
 all: vbeterm
 
-vbeterm: src/term.cxx Makefile
-	$(CXX) $(CPPFLAGS) $(CXXFLAGS) $(LDFLAGS) -o $@ $< $(LDLIBS)
+vbeterm: term.cxx Makefile
+	$(COMPILE) $(LDFLAGS) -o $@ $< $(LDLIBS)
 
 clean:
 	rm -f vbeterm
@@ -35,4 +32,14 @@ install: vbeterm
 	cp -f vbeterm $(DESTDIR)$(PREFIX)/bin/vbeterm
 	chmod 755 $(DESTDIR)$(PREFIX)/bin/vbeterm
 
-.PHONY: all clean install
+compile_commands.json: term.cxx Makefile
+	@( \
+	  dir='$(CURDIR)'; \
+	  cmd="$(COMPILE) -o /dev/null -c term.cxx"; \
+	  cmd_escaped=$$(printf '%s' "$$cmd" | sed 's/"/\\"/g'); \
+	  printf '[\n  {\n    "directory": "%s",\n    "command": "%s",\n    "file": "term.cxx"\n  }\n]\n' \
+	    "$$dir" "$$cmd_escaped" > $@; \
+	  echo "compile_commands.json written (pure /bin/sh, no bear)" \
+	)
+
+.PHONY: all clean install compile_commands.json

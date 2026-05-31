@@ -1,0 +1,8 @@
+# clangd configuration for vbeterm
+# https://clangd.llvm.org/config
+CompileFlags:
+  Add:
+    - -std=gnu++23
+  # For the full set of -I and -D flags (pkg-config + PACKAGE_* defines):
+  #   make compile_commands.json
+  # (recommended; generated from the exact same COMPILE definition as the build)
