@@ -1,58 +1,47 @@
-/*
- * Copyright (c) 2014 Vincent Bernat <bernat@luffy.cx>
- *
- * Permission to use, copy, modify, and/or distribute this software for any
- * purpose with or without fee is hereby granted, provided that the above
- * copyright notice and this permission notice appear in all copies.
- *
- * THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
- * WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
- * MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
- * ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
- * WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
- * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
- * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
- */
-
 #include <vte/vte.h>
+#include <cmath>
+#include <cstdlib>
+#include <array>
+#include <unistd.h>
+#include <sys/types.h>
+#include <sys/wait.h>
+#include <gdk/gdkkeysyms-compat.h>
+#ifdef GDK_WINDOWING_X11
+#include <gdk/gdkx.h>
+#include <X11/Xlib.h>
+#endif
 
-/* Non alphanumeric characters we consider part of a word. */
-#define TERM_WORD_CHARS "-./?%&_=+@~:"
-/* Terminal opacity */
-#define TERM_OPACITY 1
-/* Terminal font */
-#define TERM_FONT "SF Mono 14"
+// Non alphanumeric characters we consider part of a word.
+constexpr auto term_word_chars {"-./?%&_=+@~:"};
 
-void generate_palette(GdkRGBA *, const GdkRGBA *, const GdkRGBA *);
+constexpr auto term_font {"IBM Plex Mono 32"};
 
-#include <math.h>
-
-/* CIE LAB color for palette interpolation */
-typedef struct {
+// CIE LAB color for palette interpolation.
+struct LABColor {
 	double L;
 	double a;
 	double b;
-} LABColor;
+};
 
 /* The following is converted from Python.
  * See: https://github.com/jake-stewart/color256/blob/main/color256.py
  */
 
-static double
+static consteval double
 srgb_to_linear(double c)
 {
-	return c <= 0.04045 ? c / 12.92 : pow((c + 0.055) / 1.055, 2.4);
+	return c <= 0.04045 ? c / 12.92 : std::pow((c + 0.055) / 1.055, 2.4);
 }
 
-static double
+static consteval double
 linear_to_srgb(double c)
 {
 	if (c <= 0.0) return 0.0;
 	if (c >= 1.0) return 1.0;
-	return c <= 0.0031308 ? c * 12.92 : 1.055 * pow(c, 1.0 / 2.4) - 0.055;
+	return c <= 0.0031308 ? c * 12.92 : 1.055 * std::pow(c, 1.0 / 2.4) - 0.055;
 }
 
-static LABColor
+static consteval LABColor
 rgb_to_lab(const GdkRGBA *c)
 {
 	double r = srgb_to_linear(c->red);
@@ -63,14 +52,14 @@ rgb_to_lab(const GdkRGBA *c)
 	double y = (0.2126 * r + 0.7152 * g + 0.0722 * b) / 1.0;
 	double z = (0.0193 * r + 0.1192 * g + 0.9505 * b) / 1.08883;
 
-	double fx = x > 0.008856 ? cbrt(x) : 7.787 * x + 16.0 / 116.0;
-	double fy = y > 0.008856 ? cbrt(y) : 7.787 * y + 16.0 / 116.0;
-	double fz = z > 0.008856 ? cbrt(z) : 7.787 * z + 16.0 / 116.0;
+	double fx = x > 0.008856 ? std::cbrt(x) : 7.787 * x + 16.0 / 116.0;
+	double fy = y > 0.008856 ? std::cbrt(y) : 7.787 * y + 16.0 / 116.0;
+	double fz = z > 0.008856 ? std::cbrt(z) : 7.787 * z + 16.0 / 116.0;
 
 	return (LABColor){ 116.0 * fy - 16.0, 500.0 * (fx - fy), 200.0 * (fy - fz) };
 }
 
-static GdkRGBA
+static consteval GdkRGBA
 lab_to_rgb(LABColor lab)
 {
 	double fy = (lab.L + 16.0) / 116.0;
@@ -88,7 +77,7 @@ lab_to_rgb(LABColor lab)
 	return (GdkRGBA){ linear_to_srgb(r), linear_to_srgb(g), linear_to_srgb(b), 0 };
 }
 
-static LABColor
+static consteval LABColor
 lerp_lab(double t, LABColor a, LABColor b)
 {
 	return (LABColor){
@@ -101,7 +90,7 @@ lerp_lab(double t, LABColor a, LABColor b)
 /* Generate 240 extended colors (indices 16-255) from the base 8 colors
  * using trilinear interpolation in LAB colorspace.
  */
-void
+static consteval void
 generate_palette(GdkRGBA *palette, const GdkRGBA *bg, const GdkRGBA *fg)
 {
 	LABColor base8_lab[8];
@@ -134,42 +123,64 @@ generate_palette(GdkRGBA *palette, const GdkRGBA *bg, const GdkRGBA *fg)
 	}
 }
 
-#include <stdlib.h>
-#include <string.h>
-#include <unistd.h>
-#include <locale.h>
-#include <sys/types.h>
-#include <sys/wait.h>
-#include <gdk/gdkkeysyms-compat.h>
-#ifdef GDK_WINDOWING_X11
-#include <gdk/gdkx.h>
-#include <X11/Xlib.h>
-#endif
+static constexpr GdkRGBA
+gdk_rgba(guint32 rgb, double alpha = 0.0)
+{
+	auto r = (rgb & 0xff0000) >> 16;
+	auto g = (rgb & 0x00ff00) >>  8;
+	auto b = (rgb & 0x0000ff) >>  0;
+	return (GdkRGBA){
+		(double)r / 0xff,
+		(double)g / 0xff,
+		(double)b / 0xff,
+		alpha
+	};
+}
 
-#define CLR_R(x)       (((x) & 0xff0000) >> 16)
-#define CLR_G(x)       (((x) & 0x00ff00) >>  8)
-#define CLR_B(x)       (((x) & 0x0000ff) >>  0)
-#define CLR_16(x)      ((double)(x) / 0xff)
-#define CLR_GDKA(x, a) (const GdkRGBA){ .red = CLR_16(CLR_R(x)), .green = CLR_16(CLR_G(x)), .blue = CLR_16(CLR_B(x)), .alpha = a }
-#define CLR_GDK(x)     CLR_GDKA(x, 0)
-
-static const guint32 schemes[4][16]={
+static constexpr guint32 schemes[4][16]={
 {0x111111,0xd36265,0xaece91,0xe7e18c,0x5297cf,0xde7fa8,0x5e7175,0xbebebe,0x555555,0xef8171,0xcfefb3,0xfff796,0x74b8ef,0xe393b6,0xa3babf,0xdddddd},
 {0x21222c,0xff5555,0x50fa7b,0xf1fa8c,0xbd93f9,0xff79c6,0x8be9fd,0xf8f8f2,0x6272a4,0xff6e6e,0x69ff94,0xffffa5,0xd6acff,0xff92df,0xa4ffff,0xffffff},
 {0xfffbeb,0xcb3a2a,0x14710a,0x846e15,0x644ac9,0xa3144d,0x036a96,0x1f1f1f,0x6c664b,0xd74c3d,0x198d0c,0x9e841a,0x7862d0,0xbf185a,0x047fb4,0x2c2b31},
 {0x000000,0xff0000,0x00ff00,0xffff00,0x0000ff,0xff00ff,0x00ffff,0xffffff,0x666666,0xff6666,0x66ff66,0xffff66,0x6666ff,0xff66ff,0x66ffff,0xffffff}
 };
-static const guint32 fgs[4]={0xffffff,0xf8f8f2,0x1f1f1f,0xffffff};
-static const guint32 bgs[4]={0x0c0000,0x282a36,0xfffbeb,0x000000};
-static const guint32 cursors[4]={0x00bb00,0x50fa7b,0x036a96,0x00ff00};
+static constexpr guint32 fgs[4]={0xffffff,0xf8f8f2,0x1f1f1f,0xffffff};
+static constexpr guint32 bgs[4]={0x0c0000,0x282a36,0xfffbeb,0x000000};
+static constexpr guint32 cursors[4]={0x00bb00,0x50fa7b,0x036a96,0x00ff00};
 
-static void apply_colorscheme(VteTerminal *terminal, int idx);
+static consteval auto make_palettes() -> std::array<std::array<GdkRGBA, 256>, 4> {
+	std::array<std::array<GdkRGBA, 256>, 4> p{};
+	for (int s = 0; s < 4; ++s) {
+		for (int i = 0; i < 16; ++i) {
+			p[s][i] = gdk_rgba(schemes[s][i]);
+		}
+		GdkRGBA bg = gdk_rgba(bgs[s], 1);
+		GdkRGBA fg = gdk_rgba(fgs[s]);
+		generate_palette(p[s].data(), &bg, &fg);
+	}
+	return p;
+}
+
+static constexpr std::array<std::array<GdkRGBA, 256>, 4> palettes = make_palettes();
+
+static void
+apply_colorscheme(VteTerminal *terminal, int idx)
+{
+	if (idx < 0 || idx > 3) idx = 0;
+	GdkRGBA fg = gdk_rgba(fgs[idx]);
+	GdkRGBA bg = gdk_rgba(bgs[idx], 1);
+	const auto& pal = palettes[idx];
+	vte_terminal_set_colors(terminal, &fg, &bg, pal.data(), 256);
+	vte_terminal_set_bold_is_bright(terminal, TRUE);
+	GdkRGBA cc = gdk_rgba(cursors[idx]);
+	vte_terminal_set_color_cursor(terminal, &cc);
+	vte_terminal_set_cursor_blink_mode(terminal, VTE_CURSOR_BLINK_ON);
+}
 
 static void
 set_font_size(VteTerminal *terminal, gint delta)
 {
 	PangoFontDescription *descr;
-	if ((descr = pango_font_description_copy(vte_terminal_get_font(terminal))) == NULL)
+	if ((descr = pango_font_description_copy(vte_terminal_get_font(terminal))) == nullptr)
 		return;
 
 	gint current = pango_font_description_get_size(descr);
@@ -182,7 +193,7 @@ static void
 reset_font_size(VteTerminal *terminal)
 {
 	PangoFontDescription *descr;
-	if ((descr = pango_font_description_from_string(TERM_FONT)) == NULL)
+	if ((descr = pango_font_description_from_string(term_font)) == nullptr)
 		return;
 	vte_terminal_set_font(terminal, descr);
 	pango_font_description_free(descr);
@@ -200,7 +211,7 @@ on_title_changed(VteTerminal *terminal, const char *prop, gpointer user_data)
 {
 	GtkWindow *window = (GtkWindow *)user_data;
 	const char *title = vte_terminal_get_termprop_string_by_id(
-	    terminal, VTE_PROPERTY_ID_XTERM_TITLE, NULL);
+	    terminal, VTE_PROPERTY_ID_XTERM_TITLE, nullptr);
 	gtk_window_set_title(window, title ?: PACKAGE_NAME);
 }
 
@@ -307,10 +318,10 @@ get_child_environment(GApplicationCommandLine *cmdline)
 	const gchar * const *env = g_application_command_line_get_environ(cmdline);
 	n = g_strv_length((gchar **)env);
 	result = g_new (gchar *, n + 1);
-	for (n = 0, p = env; *p != NULL; ++p) {
+	for (n = 0, p = env; *p != nullptr; ++p) {
 		result[n++] = g_strdup(*p);
 	}
-	result[n] = NULL;
+	result[n] = nullptr;
 	return result;
 }
 
@@ -326,48 +337,14 @@ child_ready(VteTerminal *terminal, GPid pid, GError *error, gpointer user_data)
 }
 
 static void
-apply_colorscheme(VteTerminal *terminal, int idx)
-{
-	GdkRGBA fg = CLR_GDK(fgs[idx]);
-	GdkRGBA bg = CLR_GDKA(bgs[idx], TERM_OPACITY);
-	GdkRGBA palette[256] = {
-		CLR_GDK(schemes[idx][0]),
-		CLR_GDK(schemes[idx][1]),
-		CLR_GDK(schemes[idx][2]),
-		CLR_GDK(schemes[idx][3]),
-		CLR_GDK(schemes[idx][4]),
-		CLR_GDK(schemes[idx][5]),
-		CLR_GDK(schemes[idx][6]),
-		CLR_GDK(schemes[idx][7]),
-		CLR_GDK(schemes[idx][8]),
-		CLR_GDK(schemes[idx][9]),
-		CLR_GDK(schemes[idx][10]),
-		CLR_GDK(schemes[idx][11]),
-		CLR_GDK(schemes[idx][12]),
-		CLR_GDK(schemes[idx][13]),
-		CLR_GDK(schemes[idx][14]),
-		CLR_GDK(schemes[idx][15]),
-	};
-	generate_palette(palette, &bg, &fg);
-	vte_terminal_set_colors(terminal, &fg, &bg, palette, 256);
-	vte_terminal_set_bold_is_bright(terminal, TRUE);
-	GdkRGBA cc = CLR_GDK(cursors[idx]);
-	vte_terminal_set_color_cursor(terminal, &cc);
-	vte_terminal_set_cursor_blink_mode(terminal, VTE_CURSOR_BLINK_ON);
-}
-
-static void
 command_line(GApplication *app, GApplicationCommandLine *cmdline, gpointer user_data)
 {
 	/* Initialise GTK and the widgets */
 	GtkWidget *window, *terminal;
 	GVariantDict *options = g_application_command_line_get_options_dict(cmdline);
 
-	/* No point of respecting LC_NUMERIC in a terminal. */
-	setlocale(LC_NUMERIC, "C");
-
-	const gchar *cls = NULL;
-	const gchar *name = NULL;
+	const gchar *cls = nullptr;
+	const gchar *name = nullptr;
 	window = gtk_window_new(GTK_WINDOW_TOPLEVEL);
 	gtk_window_set_title(GTK_WINDOW(window), PACKAGE_NAME);
 	gtk_application_add_window(GTK_APPLICATION(app), GTK_WINDOW(window));
@@ -375,13 +352,13 @@ command_line(GApplication *app, GApplicationCommandLine *cmdline, gpointer user_
 	gtk_container_add(GTK_CONTAINER(window), terminal);
 	g_object_set_data(G_OBJECT(window), "terminal", terminal);
 	gtk_widget_set_visual(window, gdk_screen_get_rgba_visual(gtk_widget_get_screen(window)));
-	g_object_set(gtk_settings_get_default(), "gtk-xft-rgba", "none", NULL);
+	g_object_set(gtk_settings_get_default(), "gtk-xft-rgba", "none", nullptr);
 
 #ifdef GDK_WINDOWING_X11
 	/* Set WMCLASS */
 	g_variant_dict_lookup(options, "class", "&s", &cls);
 	g_variant_dict_lookup(options, "name", "&s", &name);
-	if (cls != NULL || name != NULL) {
+	if (cls != nullptr || name != nullptr) {
 		gtk_widget_realize(GTK_WIDGET(window));
 
 		GdkWindow *gwindow = gtk_widget_get_window(GTK_WIDGET(window));
@@ -409,21 +386,21 @@ command_line(GApplication *app, GApplicationCommandLine *cmdline, gpointer user_
 	g_application_hold(app);
 	g_object_set_data_full(G_OBJECT(cmdline), "application", app,
 	    (GDestroyNotify)g_application_release);
-	g_object_set_data_full(G_OBJECT(window), "cmdline", cmdline, NULL);
+	g_object_set_data_full(G_OBJECT(window), "cmdline", cmdline, nullptr);
 	g_object_ref(cmdline);
 
 	/* Connect some signals */
-	g_signal_connect(window, "delete-event", G_CALLBACK(on_window_close), NULL);
+	g_signal_connect(window, "delete-event", G_CALLBACK(on_window_close), nullptr);
 	g_signal_connect(window, "focus-in-event", G_CALLBACK(on_window_focus), GTK_WINDOW(window));
 	g_signal_connect(terminal, "bell", G_CALLBACK(on_bell), GTK_WINDOW(window));
 	g_signal_connect(terminal, "child-exited", G_CALLBACK(on_child_exit), GTK_WINDOW(window));
 	g_signal_connect(terminal, "termprop-changed::" VTE_TERMPROP_XTERM_TITLE, G_CALLBACK(on_title_changed), GTK_WINDOW(window));
 	g_signal_connect(terminal, "key-press-event", G_CALLBACK(on_key_press), GTK_WINDOW(window));
-	g_signal_connect(terminal, "char-size-changed", G_CALLBACK(on_char_size_changed), NULL);
+	g_signal_connect(terminal, "char-size-changed", G_CALLBACK(on_char_size_changed), nullptr);
 
 	/* Configure terminal */
 	vte_terminal_set_word_char_exceptions(VTE_TERMINAL(terminal),
-	    TERM_WORD_CHARS);
+	    term_word_chars);
 	vte_terminal_set_scrollback_lines(VTE_TERMINAL(terminal),
 	    0);
 	vte_terminal_set_scroll_on_output(VTE_TERMINAL(terminal),
@@ -439,26 +416,26 @@ command_line(GApplication *app, GApplicationCommandLine *cmdline, gpointer user_
 	    FALSE);
 
 	/* Start a new shell */
-	const gchar *cmd = NULL;
+	const gchar *cmd = nullptr;
 	g_variant_dict_lookup(options, "command", "&s", &cmd);
 
 	gchar **env;
 	env = get_child_environment(cmdline);
 
 	gchar **command;
-	gchar *command0 = NULL;
-	gchar *cmdv[4] = {NULL, NULL, NULL, NULL};
+	gchar *command0 = nullptr;
+	gchar *cmdv[4] = {nullptr, nullptr, nullptr, nullptr};
 	if (cmd) {
 		command0 = g_strdup(cmd);
 		cmdv[0] = (gchar *)"/bin/sh";
 		cmdv[1] = (gchar *)"-c";
 		cmdv[2] = command0;
-		cmdv[3] = NULL;
+		cmdv[3] = nullptr;
 		command = cmdv;
 	} else {
 		command0 = g_strdup(g_application_command_line_getenv(cmdline, "SHELL"));
 		cmdv[0] = command0;
-		cmdv[1] = NULL;
+		cmdv[1] = nullptr;
 		command = cmdv;
 	}
 
@@ -468,9 +445,9 @@ command_line(GApplication *app, GApplicationCommandLine *cmdline, gpointer user_
 	    command,
 	    env,		/* envv */
 	    (GSpawnFlags)0,			/* spawn flags */
-	    NULL, NULL, NULL,	/* child setup */
+	    nullptr, nullptr, nullptr,	/* child setup */
 	    -1,			/* timeout */
-	    NULL,		/* cancellable */
+	    nullptr,		/* cancellable */
 	    child_ready,	/* callback */
 	    window);		/* user_data */
 	/* Safe to free as those variables are g_strdupv() early in
@@ -482,23 +459,22 @@ command_line(GApplication *app, GApplicationCommandLine *cmdline, gpointer user_
 int
 main(int argc, char *argv[])
 {
-	GtkApplication *app;
 	gint status;
-	app = gtk_application_new("ch.bernat.Terminal8",
+	auto app = gtk_application_new("ch.bernat.Terminal8",
 	    (GApplicationFlags)(G_APPLICATION_HANDLES_COMMAND_LINE | G_APPLICATION_SEND_ENVIRONMENT | G_APPLICATION_NON_UNIQUE));
-	g_signal_connect(app, "command-line", G_CALLBACK(command_line), NULL);
+	g_signal_connect(app, "command-line", G_CALLBACK(command_line), nullptr);
 	g_application_add_main_option_entries(G_APPLICATION(app),
 	    (const GOptionEntry[]){
-		    { "class", 0, 0, G_OPTION_ARG_STRING, NULL,
+		    { "class", 0, 0, G_OPTION_ARG_STRING, nullptr,
 				"Program class as used by the window manager",
 				"CLASS" },
-		    { "name", 0, 0, G_OPTION_ARG_STRING, NULL,
+		    { "name", 0, 0, G_OPTION_ARG_STRING, nullptr,
 				"Program name as used by the window manager",
 				"NAME" },
-		    { "command", 'e', 0,  G_OPTION_ARG_STRING, NULL,
+		    { "command", 'e', 0,  G_OPTION_ARG_STRING, nullptr,
 				"Execute the argument to this option inside the terminal",
 				"CMD" },
-		    { NULL }
+		    { nullptr }
 	    });
 	status = g_application_run(G_APPLICATION(app), argc, argv);
 	g_object_unref(app);
